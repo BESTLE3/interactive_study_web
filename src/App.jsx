@@ -1,6 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { EXPLAINERS, HEAD_LABELS, HEAD_PATTERNS, STAGES, TOKEN_SETS } from "./content";
+import ArchitectureFigure from "./components/ArchitectureFigure";
+import FormulaBlock from "./components/FormulaBlock";
+import {
+  EXPLAINERS,
+  HEAD_LABELS,
+  HEAD_PATTERNS,
+  PROCESS_CARDS,
+  STAGES,
+  STORY_POINTS,
+  TOKEN_SETS
+} from "./content";
 
 const SECTION_VARIANTS = {
   hidden: { opacity: 0, y: 36 },
@@ -16,19 +26,129 @@ function App() {
   const [selectedToken, setSelectedToken] = useState(0);
   const [selectedHead, setSelectedHead] = useState(0);
   const [layerDepth, setLayerDepth] = useState(6);
+  const [activeProcessCard, setActiveProcessCard] = useState(null);
+  const [activeProcessIndex, setActiveProcessIndex] = useState(0);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(true);
+  const processViewportRef = useRef(null);
+  const processTrackRef = useRef(null);
 
   const tokens = TOKEN_SETS[scenario];
 
   const attentionWeights = useMemo(() => {
-    const base = HEAD_PATTERNS[selectedHead];
-    return tokens.map((_, index) => {
-      const raw = base[index] ?? 0.08;
-      const distanceBoost = Math.max(0, 0.12 - Math.abs(selectedToken - index) * 0.025);
-      return Number(Math.min(0.82, raw + distanceBoost).toFixed(2));
-    });
-  }, [selectedHead, selectedToken, tokens]);
+    const scenarioPatterns = HEAD_PATTERNS[scenario] ?? [];
+    const headPatterns = scenarioPatterns[selectedHead] ?? [];
+    const selectedPattern = headPatterns[selectedToken];
+
+    if (selectedPattern) {
+      return selectedPattern;
+    }
+
+    return tokens.map(() => Number((1 / tokens.length).toFixed(4)));
+  }, [scenario, selectedHead, selectedToken, tokens]);
 
   const currentStage = STAGES[Math.min(STAGES.length - 1, Math.floor(layerDepth / 2))];
+
+  const getProcessCards = () => {
+    const track = processTrackRef.current;
+
+    if (!track) {
+      return [];
+    }
+
+    return Array.from(track.querySelectorAll(".process-card"));
+  };
+
+  const updateProcessCarouselState = () => {
+    const viewport = processViewportRef.current;
+    const cards = getProcessCards();
+
+    if (!viewport || cards.length === 0) {
+      return;
+    }
+
+    const nextIndex = cards.reduce((closestIndex, card, index) => {
+      const currentDistance = Math.abs(card.offsetLeft - viewport.scrollLeft);
+      const closestDistance = Math.abs(cards[closestIndex].offsetLeft - viewport.scrollLeft);
+      return currentDistance < closestDistance ? index : closestIndex;
+    }, 0);
+    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+
+    setActiveProcessIndex(Math.min(PROCESS_CARDS.length - 1, Math.max(0, nextIndex)));
+    setCanScrollPrev(viewport.scrollLeft > 8);
+    setCanScrollNext(viewport.scrollLeft < maxScrollLeft - 8);
+  };
+
+  const scrollToProcessCard = (index) => {
+    const viewport = processViewportRef.current;
+    const cards = getProcessCards();
+
+    if (!viewport || cards.length === 0) {
+      return;
+    }
+
+    const nextIndex = Math.min(PROCESS_CARDS.length - 1, Math.max(0, index));
+    viewport.scrollTo({
+      left: cards[nextIndex].offsetLeft,
+      behavior: "smooth"
+    });
+  };
+
+  useEffect(() => {
+    const session = new URLSearchParams(window.location.search).get("session");
+
+    if (!session) {
+      return undefined;
+    }
+
+    const heartbeatUrl = `/__heartbeat?session=${encodeURIComponent(session)}`;
+    const closeUrl = `/__close?session=${encodeURIComponent(session)}`;
+
+    const sendHeartbeat = () => {
+      fetch(heartbeatUrl, {
+        method: "POST",
+        cache: "no-store",
+        keepalive: true
+      }).catch(() => {});
+    };
+
+    const sendClose = () => {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(closeUrl, "");
+        return;
+      }
+
+      fetch(closeUrl, {
+        method: "POST",
+        cache: "no-store",
+        keepalive: true
+      }).catch(() => {});
+    };
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 5000);
+    window.addEventListener("pagehide", sendClose);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("pagehide", sendClose);
+    };
+  }, []);
+
+  useEffect(() => {
+    updateProcessCarouselState();
+
+    const handleResize = () => updateProcessCarouselState();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const handleProcessCardClick = (card) => {
+    setActiveProcessCard(card);
+  };
 
   return (
     <main className="page-shell">
@@ -37,8 +157,10 @@ function App() {
           <p className="eyebrow">INTERACTIVE STUDY / TRANSFORMER ATLAS</p>
           <h1>트랜스포머가 문맥을 읽고 다음 토큰을 고르는 과정을 눈으로 따라갑니다.</h1>
           <p className="hero-body">
-            입력 벡터, 위치 정보, 셀프 어텐션, 멀티 헤드, 피드포워드, 디코더 출력을 한 화면에서
-            조작하면서 구조를 이해할 수 있게 설계했습니다.
+            이 페이지는 트랜스포머의 핵심 구성 요소인 임베딩, 위치 인코딩, 셀프 어텐션,
+            멀티-헤드 구조, 피드포워드 네트워크, 오토리그레시브 디코딩을 한 흐름으로 설명합니다.
+            대학 강의 수준의 개념은 유지하되, 각 단계가 무엇을 계산하는지 직관적으로 따라갈 수 있도록
+            시각화와 조작 패널을 함께 배치했습니다.
           </p>
           <div className="hero-actions">
             <a href="#lab" className="primary-link">
@@ -84,13 +206,26 @@ function App() {
       >
         <div>
           <p className="section-kicker">핵심 개념</p>
-          <h2>트랜스포머는 순차 처리보다 관계 계산을 우선합니다.</h2>
+          <h2>트랜스포머는 순서를 한 칸씩 처리하기보다, 관계를 행렬 형태로 한꺼번에 계산합니다.</h2>
         </div>
         <div className="story-points">
-          <p>모든 토큰이 서로를 동시에 바라보며 의미 네트워크를 만듭니다.</p>
-          <p>멀티-헤드는 문법, 주제, 거리, 예측 힌트를 서로 다른 관점으로 나눠 읽습니다.</p>
-          <p>디코더는 미래 토큰을 가리지 못하도록 마스킹해 다음 단어만 예측하게 만듭니다.</p>
+          {STORY_POINTS.map((point) => (
+            <p key={point}>{point}</p>
+          ))}
         </div>
+      </motion.section>
+
+      <motion.section
+        className="architecture-section"
+        variants={SECTION_VARIANTS}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+      >
+        <div className="architecture-copy">
+          <p className="section-kicker">구조 도식</p>
+        </div>
+        <ArchitectureFigure />
       </motion.section>
 
       <motion.section
@@ -104,7 +239,6 @@ function App() {
         <div className="lab-header">
           <div>
             <p className="section-kicker">실험 패널</p>
-            <h2>입력과 헤드를 바꾸면 어텐션 지도가 즉시 바뀝니다.</h2>
           </div>
           <div className="control-row scenario-tabs">
             {Object.keys(TOKEN_SETS).map((key) => (
@@ -128,7 +262,7 @@ function App() {
           <section className="panel panel-wide">
             <div className="panel-heading">
               <h3>Token Stream</h3>
-              <p>하나의 토큰을 선택해 어떤 단어를 강하게 참고하는지 확인합니다.</p>
+              <p>하나의 토큰을 기준으로 잡고, 그 토큰이 문맥을 해석할 때 어떤 단어에 더 큰 주의를 두는지 확인합니다.</p>
             </div>
             <div className="token-row">
               {tokens.map((token, index) => (
@@ -165,7 +299,7 @@ function App() {
           <section className="panel">
             <div className="panel-heading">
               <h3>Head Selector</h3>
-              <p>각 헤드는 다른 종류의 관계를 포착합니다.</p>
+              <p>각 어텐션 헤드는 동일한 문장을 보더라도 서로 다른 통계적 관계 패턴을 학습할 수 있습니다.</p>
             </div>
             <div className="head-list">
               {[0, 1, 2, 3].map((head) => (
@@ -186,7 +320,7 @@ function App() {
           <section className="panel">
             <div className="panel-heading">
               <h3>Layer Depth</h3>
-              <p>레이어 수가 늘수록 더 추상적인 표현이 만들어집니다.</p>
+              <p>레이어가 깊어질수록 표현은 단순한 단어 수준에서 문장 구조와 의미 수준의 추상 표현으로 이동합니다.</p>
             </div>
             <div className="slider-block">
               <input
@@ -208,7 +342,7 @@ function App() {
           <section className="panel">
             <div className="panel-heading">
               <h3>Decoder Note</h3>
-              <p>생성 시점에는 미래 토큰을 볼 수 없습니다.</p>
+              <p>생성 모델은 미래 정보를 미리 볼 수 없으므로, 마스킹을 통해 항상 과거와 현재 정보만 참조하도록 제한됩니다.</p>
             </div>
             <div className="mask-grid">
               {tokens.map((token, rowIndex) => (
@@ -244,6 +378,68 @@ function App() {
       </motion.section>
 
       <motion.section
+        className="process-section"
+        variants={SECTION_VARIANTS}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+      >
+        <div className="process-header">
+          <p className="section-kicker">수학적 작동 순서</p>
+        </div>
+        <div className="process-carousel">
+          <div
+            ref={processViewportRef}
+            className="process-viewport"
+            onScroll={updateProcessCarouselState}
+          >
+            <div ref={processTrackRef} className="process-flow">
+              {PROCESS_CARDS.map((card) => (
+                <article key={card.id} className="process-card">
+                  <button
+                    type="button"
+                    className="process-card-button"
+                    onClick={() => handleProcessCardClick(card)}
+                  >
+                    <span className="process-step">{card.step}</span>
+                    <p className="section-kicker">{card.kicker}</p>
+                    <h3>{card.title}</h3>
+                    <p>{card.summary}</p>
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          {canScrollPrev ? (
+            <div className="process-nav-zone process-nav-zone-left">
+              <button
+                type="button"
+                className="process-nav-button"
+                aria-label="이전 카드 보기"
+                onClick={() => scrollToProcessCard(activeProcessIndex - 1)}
+              >
+                ←
+              </button>
+            </div>
+          ) : null}
+
+          {canScrollNext ? (
+            <div className="process-nav-zone process-nav-zone-right">
+              <button
+                type="button"
+                className="process-nav-button"
+                aria-label="다음 카드 보기"
+                onClick={() => scrollToProcessCard(activeProcessIndex + 1)}
+              >
+                →
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </motion.section>
+
+      <motion.section
         className="footer-cta"
         variants={SECTION_VARIANTS}
         initial="hidden"
@@ -251,11 +447,51 @@ function App() {
         viewport={{ once: true, amount: 0.4 }}
       >
         <p className="section-kicker">요약</p>
-        <h2>트랜스포머는 “순서대로 읽는 모델”이 아니라 “관계를 한 번에 계산하는 모델”입니다.</h2>
+        <h2>트랜스포머는 “단어를 차례로 읽는 장치”가 아니라 “토큰 사이 관계를 확률적으로 계산하는 구조”입니다.</h2>
         <p>
-          이 페이지는 발표 자료, 개인 학습, 수업 데모 용도로 로컬에서 바로 실행할 수 있게 구성했습니다.
+          따라서 트랜스포머를 이해한다는 것은 단순히 모델 이름을 아는 것이 아니라, 어텐션 가중치가 어떻게
+          정보 흐름을 재구성하고 그 결과가 다음 토큰 예측으로 이어지는지를 이해하는 일에 가깝습니다.
         </p>
       </motion.section>
+
+      {activeProcessCard ? (
+        <div
+          className="process-modal-backdrop"
+          role="presentation"
+          onClick={() => setActiveProcessCard(null)}
+        >
+          <section
+            className="process-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="process-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="process-modal-close"
+              aria-label="닫기"
+              onClick={() => setActiveProcessCard(null)}
+            >
+              ×
+            </button>
+            <span className="process-step">{activeProcessCard.step}</span>
+            <p className="section-kicker">{activeProcessCard.kicker}</p>
+            <h3 id="process-modal-title">{activeProcessCard.title}</h3>
+            <p className="process-modal-summary">{activeProcessCard.summary}</p>
+            <div className="process-modal-formulas">
+              {activeProcessCard.formulas.map((formula) => (
+                <FormulaBlock key={formula} formula={formula} />
+              ))}
+            </div>
+            <div className="process-modal-body">
+              {activeProcessCard.details.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -10,6 +10,7 @@
     "launch": "node scripts/launcher.mjs"
   },
   "dependencies": {
+    "katex": "^0.16.11",
     "framer-motion": "^12.6.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

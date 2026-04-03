@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, createReadStream, statSync, rmSync } from "node:fs";
 import { promises as fs } from "node:fs";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -11,13 +12,18 @@ const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.dirname(scriptsDir);
 const distDir = path.join(projectDir, "dist");
 const port = 4173;
+const sessionToken = randomUUID();
 const baseUrl = `http://localhost:${port}`;
+const appUrl = `${baseUrl}/?session=${sessionToken}`;
 const logPrefix = "[launcher]";
+const heartbeatTimeoutMs = 15000;
 
 let server;
 let browserProcess;
 let browserProfileDir;
 let shuttingDown = false;
+let lastHeartbeatAt = Date.now();
+let heartbeatWatchdog;
 
 function runCommand(command, args) {
   const result = spawnSync(command, args, {
@@ -149,6 +155,11 @@ function getContentType(filePath) {
   }
 }
 
+function isValidSession(urlPath) {
+  const requestUrl = new URL(urlPath ?? "/", baseUrl);
+  return requestUrl.searchParams.get("session") === sessionToken;
+}
+
 function looksLikeAssetRequest(requestPath) {
   return path.extname(requestPath) !== "";
 }
@@ -177,6 +188,34 @@ function resolveFile(urlPath) {
 async function startServer() {
   server = createServer((req, res) => {
     try {
+      if (req.url?.startsWith("/__heartbeat")) {
+        if (!isValidSession(req.url)) {
+          res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Invalid session");
+          return;
+        }
+
+        lastHeartbeatAt = Date.now();
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.url?.startsWith("/__close")) {
+        if (!isValidSession(req.url)) {
+          res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Invalid session");
+          return;
+        }
+
+        res.writeHead(204);
+        res.end();
+        setTimeout(() => {
+          shutdown(0);
+        }, 0);
+        return;
+      }
+
       const filePath = resolveFile(req.url);
 
       if (!filePath) {
@@ -197,6 +236,12 @@ async function startServer() {
     server.once("error", reject);
     server.listen(port, "127.0.0.1", () => resolve());
   });
+
+  heartbeatWatchdog = setInterval(() => {
+    if (Date.now() - lastHeartbeatAt > heartbeatTimeoutMs) {
+      shutdown(0);
+    }
+  }, 2000);
 }
 
 function explainLauncherError(error) {
@@ -220,7 +265,7 @@ async function openChrome() {
     `--user-data-dir=${browserProfileDir}`,
     "--no-first-run",
     "--no-default-browser-check",
-    `--app=${baseUrl}`,
+    `--app=${appUrl}`,
     "--new-window"
   ];
 
@@ -253,6 +298,10 @@ async function shutdown(code = 0) {
     });
   }
 
+  if (heartbeatWatchdog) {
+    clearInterval(heartbeatWatchdog);
+  }
+
   if (browserProfileDir) {
     try {
       rmSync(browserProfileDir, { recursive: true, force: true });
@@ -276,9 +325,9 @@ async function main() {
   ensureDependencies();
   buildApp();
   await startServer();
-  console.log(`${logPrefix} 로컬 서버 시작: ${baseUrl}`);
+  console.log(`${logPrefix} 로컬 서버 시작: ${appUrl}`);
   await openChrome();
-  console.log(`${logPrefix} Chrome 앱 창이 닫히면 서버도 종료됩니다.`);
+  console.log(`${logPrefix} 실행기가 연 localhost 창이 닫히면 서버도 종료됩니다.`);
 }
 
 main().catch((error) => {

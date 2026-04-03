@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-PROJECT_DIR="/Users/jojongseong/AI_workspace/interactive_study_web"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_URL="http://localhost:4173"
 PORT="4173"
 LOG_FILE="$PROJECT_DIR/.local-web.log"

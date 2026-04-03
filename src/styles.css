@@ -51,6 +51,11 @@ button {
 .hero,
 .story-strip,
 .lab,
+.architecture-section,
+.math-section,
+.dimension-section,
+.block-section,
+.flow-section,
 .explainers,
 .footer-cta {
   position: relative;
@@ -87,8 +92,8 @@ button {
 }
 
 .hero h1 {
-  font-size: clamp(3.3rem, 7vw, 6.4rem);
-  max-width: 10ch;
+  font-size: clamp(2.6rem, 5.2vw, 4.8rem);
+  max-width: 11ch;
 }
 
 .hero-body {
@@ -186,6 +191,8 @@ button {
 }
 
 .story-strip,
+.math-card,
+.flow-card,
 .footer-cta {
   display: grid;
   gap: 18px;
@@ -198,11 +205,34 @@ button {
   grid-template-columns: 0.9fr 1.1fr;
 }
 
+.architecture-section {
+  margin-top: 22px;
+}
+
+.architecture-copy {
+  margin-bottom: 18px;
+}
+
+.architecture-figure {
+  border: 1px solid rgba(24, 53, 99, 0.12);
+  border-radius: 28px;
+  overflow: hidden;
+  background: rgba(255, 251, 244, 0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px rgba(25, 44, 78, 0.08);
+}
+
+.architecture-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .story-strip h2,
 .lab h2,
 .footer-cta h2 {
-  font-size: clamp(2rem, 4vw, 3.5rem);
-  max-width: 12ch;
+  font-size: clamp(1.7rem, 3vw, 2.7rem);
+  max-width: 14ch;
 }
 
 .story-points {
@@ -407,13 +437,226 @@ button {
   margin-top: 22px;
 }
 
+.process-section {
+  margin-top: 22px;
+}
+
+.process-header {
+  margin-bottom: 18px;
+}
+
+.process-carousel {
+  position: relative;
+  background: transparent;
+}
+
+.formula-block {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(23, 52, 95, 0.08);
+  color: #17345f;
+  overflow-x: auto;
+}
+
+.formula-block .katex-display {
+  margin: 0;
+}
+
+.formula-block .katex {
+  font-size: 1.02rem;
+}
+
+.process-flow {
+  display: flex;
+  gap: 16px;
+}
+
+.process-viewport {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  user-select: none;
+  background: transparent;
+}
+
+.process-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.process-card {
+  flex: 0 0 min(320px, calc(100vw - 80px));
+  display: flex;
+  scroll-snap-align: start;
+}
+
+.process-card-button {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(24, 53, 99, 0.12);
+  border-radius: 26px;
+  background: rgba(255, 251, 244, 0.78);
+  backdrop-filter: blur(14px);
+  padding: 22px;
+  text-align: left;
+  box-shadow: 0 18px 40px rgba(25, 44, 78, 0.08);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.process-card-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(24, 53, 99, 0.22);
+}
+
+.process-card-button h3 {
+  margin: 10px 0 12px;
+  font-family: "Avenir Next", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  font-size: 1.42rem;
+  line-height: 1.12;
+  color: #17345f;
+}
+
+.process-card-button p:last-child {
+  margin: 0;
+  color: rgba(22, 33, 58, 0.78);
+}
+
+.process-step {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #17345f;
+  color: #fff7ed;
+  font-family: "Avenir Next", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
+.process-nav-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 92px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  background: transparent;
+}
+
+.process-nav-zone-left {
+  left: 0;
+  justify-content: flex-start;
+}
+
+.process-nav-zone-right {
+  right: 0;
+  justify-content: flex-end;
+}
+
+.process-nav-button {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: auto;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(23, 52, 95, 0.9);
+  color: #fff7ed;
+  font-size: 1.4rem;
+  box-shadow: 0 16px 30px rgba(23, 52, 95, 0.24);
+  transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.process-nav-zone:hover .process-nav-button {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.process-nav-button:hover {
+  background: #102b52;
+}
+
+.process-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(13, 25, 46, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.process-modal {
+  position: relative;
+  width: min(860px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: auto;
+  border: 1px solid rgba(24, 53, 99, 0.14);
+  border-radius: 30px;
+  background: rgba(255, 251, 244, 0.96);
+  padding: 28px;
+  box-shadow: 0 24px 80px rgba(16, 31, 57, 0.22);
+}
+
+.process-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(23, 52, 95, 0.08);
+  color: #17345f;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.process-modal h3 {
+  margin: 10px 0 14px;
+  padding-right: 48px;
+  font-family: "Avenir Next", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  line-height: 1.1;
+  color: #17345f;
+}
+
+.process-modal-summary {
+  margin: 0 0 18px;
+  font-size: 1.05rem;
+  color: rgba(22, 33, 58, 0.84);
+}
+
+.process-modal-formulas {
+  display: grid;
+  gap: 12px;
+}
+
+.process-modal-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.process-modal-body p {
+  margin: 0;
+  color: rgba(22, 33, 58, 0.82);
+}
+
 .explainer {
   padding: 6px 0;
 }
 
 .explainer h3 {
-  font-size: clamp(1.7rem, 3vw, 2.5rem);
-  max-width: 12ch;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  max-width: 14ch;
 }
 
 .explainer p:last-child,
@@ -453,19 +696,38 @@ button {
   .hero h1,
   .story-strip h2,
   .lab h2,
+  .process-section h2,
   .footer-cta h2,
-  .explainer h3 {
+  .explainer h3,
+  .process-card-button h3 {
     max-width: none;
   }
 
   .hero-visual,
   .story-strip,
   .panel,
+  .process-card-button,
   .footer-cta {
     border-radius: 22px;
   }
 
   .token-chip {
     min-width: calc(50% - 5px);
+  }
+
+  .process-flow {
+    gap: 12px;
+  }
+
+  .process-card {
+    flex-basis: min(300px, calc(100vw - 40px));
+  }
+
+  .process-card-button {
+    min-height: 300px;
+  }
+
+  .process-nav-zone {
+    width: 64px;
   }
 }
