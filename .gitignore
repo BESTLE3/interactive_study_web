@@ -3,4 +3,5 @@ dist/
 .DS_Store
 .local-web.log
 .vite-dev.log
+WORKLOG.md
 *.tmp
