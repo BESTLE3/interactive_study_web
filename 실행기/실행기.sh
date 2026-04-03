@@ -3,4 +3,4 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-node launcher.mjs
+node scripts/launcher.mjs

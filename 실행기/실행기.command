@@ -2,5 +2,5 @@
 
 set -euo pipefail
 
-cd "/Users/jojongseong/AI_workspace/interactive_study_web"
-node launcher.mjs
+cd "$(dirname "$0")/.."
+node scripts/launcher.mjs

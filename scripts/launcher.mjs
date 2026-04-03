@@ -7,7 +7,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
+const projectDir = path.dirname(scriptsDir);
 const distDir = path.join(projectDir, "dist");
 const port = 4173;
 const baseUrl = `http://localhost:${port}`;
@@ -77,6 +78,32 @@ function getChromeCandidates() {
   ];
 }
 
+function getExecutableFromPath(names) {
+  const command = process.platform === "win32" ? "where" : "which";
+
+  for (const name of names) {
+    const result = spawnSync(command, [name], {
+      cwd: projectDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      shell: process.platform === "win32"
+    });
+
+    if (result.status === 0) {
+      const foundPath = result.stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean);
+
+      if (foundPath && existsSync(foundPath)) {
+        return foundPath;
+      }
+    }
+  }
+
+  return null;
+}
+
 async function findChromeExecutable() {
   for (const candidate of getChromeCandidates()) {
     if (candidate && existsSync(candidate)) {
@@ -84,7 +111,15 @@ async function findChromeExecutable() {
     }
   }
 
-  return null;
+  if (process.platform === "darwin") {
+    return getExecutableFromPath(["google-chrome", "chromium"]);
+  }
+
+  if (process.platform === "win32") {
+    return getExecutableFromPath(["chrome", "chromium"]);
+  }
+
+  return getExecutableFromPath(["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]);
 }
 
 function getContentType(filePath) {
@@ -114,10 +149,14 @@ function getContentType(filePath) {
   }
 }
 
-async function resolveFile(urlPath) {
-  const safePath = decodeURIComponent(urlPath.split("?")[0]);
-  const targetPath = safePath === "/" ? "/index.html" : safePath;
-  const candidate = path.normalize(path.join(distDir, targetPath));
+function looksLikeAssetRequest(requestPath) {
+  return path.extname(requestPath) !== "";
+}
+
+function resolveFile(urlPath) {
+  const safePath = decodeURIComponent((urlPath ?? "/").split("?")[0]);
+  const requestPath = safePath === "/" ? "/index.html" : safePath;
+  const candidate = path.normalize(path.join(distDir, requestPath));
 
   if (!candidate.startsWith(distDir)) {
     return null;
@@ -127,17 +166,21 @@ async function resolveFile(urlPath) {
     return candidate;
   }
 
+  if (looksLikeAssetRequest(requestPath)) {
+    return null;
+  }
+
   const fallback = path.join(distDir, "index.html");
   return existsSync(fallback) ? fallback : null;
 }
 
 async function startServer() {
-  server = createServer(async (req, res) => {
+  server = createServer((req, res) => {
     try {
-      const filePath = await resolveFile(req.url ?? "/");
+      const filePath = resolveFile(req.url);
 
       if (!filePath) {
-        res.writeHead(404);
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
         res.end("Not found");
         return;
       }
@@ -145,7 +188,7 @@ async function startServer() {
       res.writeHead(200, { "Content-Type": getContentType(filePath) });
       createReadStream(filePath).pipe(res);
     } catch {
-      res.writeHead(500);
+      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("Server error");
     }
   });
@@ -156,11 +199,19 @@ async function startServer() {
   });
 }
 
+function explainLauncherError(error) {
+  if (error?.code === "EADDRINUSE") {
+    return `포트 ${port}가 이미 사용 중입니다. 기존 실행기 창이나 로컬 서버를 먼저 종료하세요.`;
+  }
+
+  return error?.message ?? "Launcher failed";
+}
+
 async function openChrome() {
   const chromeExecutable = await findChromeExecutable();
 
   if (!chromeExecutable) {
-    throw new Error("Chrome executable not found");
+    throw new Error("Google Chrome 또는 Chromium 실행 파일을 찾지 못했습니다.");
   }
 
   browserProfileDir = await fs.mkdtemp(path.join(os.tmpdir(), "interactive-study-web-"));
@@ -215,7 +266,7 @@ function registerSignals() {
   process.on("SIGINT", () => shutdown(0));
   process.on("SIGTERM", () => shutdown(0));
   process.on("uncaughtException", (error) => {
-    console.error(`${logPrefix} ${error.message}`);
+    console.error(`${logPrefix} ${explainLauncherError(error)}`);
     shutdown(1);
   });
 }
@@ -231,6 +282,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`${logPrefix} ${error.message}`);
+  console.error(`${logPrefix} ${explainLauncherError(error)}`);
   process.exit(1);
 });
